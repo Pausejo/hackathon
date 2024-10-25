@@ -1,24 +1,50 @@
+import datetime
+from fastapi import FastAPI, Request, Response
+from pydantic import BaseModel
 from llama_index.llms.mistralai import MistralAI
 from llama_index.core.llms import ChatMessage
-from llama_index.llms.mistralai import MistralAI
+import uvicorn
+from supabase import create_client
+from twilio.twiml.messaging_response import MessagingResponse
 
-
-# To customize your API key, do this
-# otherwise it will lookup MISTRAL_API_KEY from your env variable
-# llm = MistralAI(api_key="<api_key>")
+app = FastAPI()
 
 class ChatBot:
     def __init__(self):
-        self.llm = MistralAI(api_key="<replace-with-your-key>")
+        self.llm = MistralAI(api_key="")
 
-    def chat(self, messages):
-        if not messages:
-            messages = [
-                ChatMessage(role="system", content="You are CEO of MistralAI."),
-                ChatMessage(role="user", content="Tell me the story about La plateforme"),
+    def chat(self, user_message):
+        messages = [
+            ChatMessage(role="system", content="you are a customer support assistant"),
+            ChatMessage(role="user", content=user_message),
         ]
-        resp = MistralAI().chat(messages) 
+        resp = self.llm.chat(messages) 
 
-        return resp       
+        return resp   
 
 
+chatbot = ChatBot()
+
+@app.post("/api/whatsapp")
+async def whatsapp_webhook(request: Request):
+    # Parse the incoming WhatsApp message from Twilio
+    form_data = await request.form()
+    message_body = form_data.get("Body", "")
+
+    
+    # Get response from chatbot
+    app.logger.info(message_body)
+    response = chatbot.chat(message_body)
+
+
+    # Return TwiML response
+    twiml = MessagingResponse()
+    twiml.message(str(response))
+    
+    return Response(
+        content=str(twiml),
+        media_type="application/xml"
+    )
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="debug")
