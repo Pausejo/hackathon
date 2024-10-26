@@ -7,6 +7,9 @@
 
     <v-navigation-drawer v-model="drawer">
       <v-list>
+        <v-list-item title="Threads" to="/threads" prepend-icon="mdi-message" />
+      </v-list>
+      <v-list>
         <v-list-item title="Configurator" to="/" prepend-icon="mdi-cog" />
       </v-list>
       <v-list>

@@ -39,6 +39,7 @@ export type Database = {
         Row: {
           id: string;
           created_at: string;
+          reference: string;
           conversation_history: Json[];
         };
       };
