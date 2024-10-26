@@ -62,14 +62,15 @@
     />
 
     <!-- Create Agent Dialog -->
-    <v-dialog v-model="dialog" max-width="500px">
+    <v-dialog v-model="dialog" max-width="700px">
       <v-card>
         <v-card-title>Create New Agent</v-card-title>
         <v-card-text>
-          <v-form ref="form">
+          <v-form ref="form" v-model="formValid">
             <v-textarea
               v-model="newAgent.description"
               label="Description"
+              :rules="[(v) => !!v || 'Description is required']"
               required
             />
 
@@ -90,19 +91,24 @@
                 :key="index"
                 class="action-item mb-4"
               >
-                <div class="d-flex align-center gap-2">
+                <div class="d-flex align-start gap-2">
                   <v-select
                     v-model="action.type"
                     :items="['URL', 'DB']"
                     label="Type"
                     required
+                    density="compact"
+                    style="width: 25%"
                   />
                   <v-text-field
                     v-model="action.action"
                     label="Action"
+                    density="compact"
                     required
+                    style="width: 75%"
                   />
                   <v-btn
+                    class="ml-2"
                     color="error"
                     icon="mdi-delete"
                     size="small"
@@ -116,7 +122,12 @@
         <v-card-actions>
           <v-spacer />
           <v-btn color="error" @click="dialog = false">Cancel</v-btn>
-          <v-btn color="primary" @click="createAgent" :loading="loading">
+          <v-btn
+            color="primary"
+            @click="createAgent"
+            :loading="loading"
+            :disabled="!formValid"
+          >
             Create Agent
           </v-btn>
         </v-card-actions>
@@ -146,6 +157,9 @@ const agents = ref<
     updating?: boolean;
   }[]
 >([]);
+
+const form = ref<any>(null);
+const formValid = ref(false);
 
 // Update the agents type to include is_enabled
 const toggleAgent = async (agent: any) => {
@@ -213,6 +227,9 @@ const removeAction = (index: number) => {
 // Update createAgent function
 const createAgent = async () => {
   try {
+    const { valid } = await form.value.validate();
+    if (!valid) return;
+
     loading.value = true;
 
     // First create the agent
