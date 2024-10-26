@@ -14,7 +14,6 @@ export type Database = {
           id: string;
           created_at: string;
           description: string;
-          url: string;
           is_enabled: boolean;
           usage_count: number;
           success_rate: number;

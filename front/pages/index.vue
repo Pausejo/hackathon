@@ -17,7 +17,7 @@
             }"
           >
             <v-card-title class="d-flex justify-space-between align-center">
-              <span>Agent</span>
+              <span>Agent {{ agent.id }}</span>
               <v-switch
                 v-model="agent.is_enabled"
                 :loading="agent.updating"
@@ -30,14 +30,21 @@
             <v-card-text>
               <p class="text-body-1 text-grey">{{ agent.description }}</p>
               <v-chip
-                class="mt-2"
+                v-for="action in agent.actions"
+                class="mt-2 mr-2"
                 color="primary"
                 link
-                :href="agent.url"
+                :href="action.type === 'URL' ? action.action : undefined"
                 target="_blank"
               >
-                <v-icon start icon="mdi-link" />
-                URL
+                <v-tooltip activator="parent" location="top">
+                  {{ action.action }}
+                </v-tooltip>
+                <v-icon
+                  start
+                  :icon="action.type === 'URL' ? 'mdi-link' : 'mdi-database'"
+                />
+                {{ action.type }}
               </v-chip>
             </v-card-text>
           </v-card>
@@ -65,7 +72,45 @@
               label="Description"
               required
             />
-            <v-text-field v-model="newAgent.url" label="URL" required />
+
+            <!-- New Actions Section -->
+            <div class="actions-section">
+              <div class="d-flex justify-space-between align-center mb-3">
+                <h3 class="text-h6">Actions</h3>
+                <v-btn
+                  color="primary"
+                  size="small"
+                  @click="addAction"
+                  icon="mdi-plus"
+                />
+              </div>
+
+              <div
+                v-for="(action, index) in newAgent.actions"
+                :key="index"
+                class="action-item mb-4"
+              >
+                <div class="d-flex align-center gap-2">
+                  <v-select
+                    v-model="action.type"
+                    :items="['URL', 'DB']"
+                    label="Type"
+                    required
+                  />
+                  <v-text-field
+                    v-model="action.action"
+                    label="Action"
+                    required
+                  />
+                  <v-btn
+                    color="error"
+                    icon="mdi-delete"
+                    size="small"
+                    @click="removeAction(index)"
+                  />
+                </div>
+              </div>
+            </div>
           </v-form>
         </v-card-text>
         <v-card-actions>
@@ -90,14 +135,14 @@ const dialog = ref(false);
 const loading = ref(false);
 const newAgent = ref({
   description: "",
-  url: "",
+  actions: [] as { type: string; action: string }[],
 });
 const agents = ref<
   {
     id: string;
     description: string;
-    url: string;
     is_enabled: boolean;
+    actions: { type: string; action: string }[];
     updating?: boolean;
   }[]
 >([]);
@@ -125,18 +170,30 @@ const toggleAgent = async (agent: any) => {
     agent.updating = false;
   }
 };
-
 // Update fetchAgents to include is_enabled
 const fetchAgents = async () => {
   try {
     const { data, error } = await supabase
       .from("agents")
-      .select("id, description, url, is_enabled")
+      .select(
+        `
+        id, 
+        description, 
+        is_enabled,
+        agent_actions (
+          action:actions(id, type, action)
+        )
+      `
+      )
       .order("created_at", { ascending: false });
 
     if (error) throw error;
     agents.value = data.map((agent) => ({
       ...agent,
+      actions: agent.agent_actions.map((aa) => ({
+        type: aa.action.type,
+        action: aa.action.action,
+      })),
       updating: false, // Add updating property for loading state
     }));
   } catch (error) {
@@ -144,26 +201,70 @@ const fetchAgents = async () => {
   }
 };
 
-// Update createAgent to include is_enabled
+// Add new helper functions
+const addAction = () => {
+  newAgent.value.actions.push({ type: "URL", action: "" });
+};
+
+const removeAction = (index: number) => {
+  newAgent.value.actions.splice(index, 1);
+};
+
+// Update createAgent function
 const createAgent = async () => {
   try {
     loading.value = true;
-    const { error } = await supabase.from("agents").insert([
-      {
-        description: newAgent.value.description,
-        url: newAgent.value.url,
-        is_enabled: true, // Set default value for new agents
-      },
-    ]);
 
-    if (error) throw error;
+    // First create the agent
+    const { data: agentData, error: agentError } = await supabase
+      .from("agents")
+      .insert([
+        {
+          description: newAgent.value.description,
+          is_enabled: true,
+        },
+      ])
+      .select();
+
+    if (agentError) throw agentError;
+
+    // Then create all actions
+    const actionsPromises = newAgent.value.actions.map(async (action) => {
+      // Create action
+      const { data: actionData, error: actionError } = await supabase
+        .from("actions")
+        .insert([
+          {
+            type: action.type,
+            action: action.action,
+          },
+        ])
+        .select();
+
+      if (actionError) throw actionError;
+
+      // Create agent_action relationship
+      const { error: relationError } = await supabase
+        .from("agent_actions")
+        .insert([
+          {
+            agent_id: agentData[0].id,
+            action_id: actionData[0].id,
+          },
+        ]);
+
+      if (relationError) throw relationError;
+    });
+
+    await Promise.all(actionsPromises);
 
     // Reset form and close dialog
     dialog.value = false;
     newAgent.value = {
       description: "",
-      url: "",
+      actions: [],
     };
+
     // Refresh the agents list
     await fetchAgents();
   } catch (error) {
