@@ -13,10 +13,24 @@
           md="4"
           lg="3"
         >
-          <v-card>
-            <v-card-title>Agent {{ agent.id }}</v-card-title>
+          <v-card
+            :class="{
+              'disabled-card': !agent.is_enabled,
+            }"
+          >
+            <v-card-title class="d-flex justify-space-between align-center">
+              <span>Agent</span>
+              <v-switch
+                v-model="agent.is_enabled"
+                :loading="agent.updating"
+                density="compact"
+                color="primary"
+                hide-details
+                @update:model-value="toggleAgent(agent)"
+              />
+            </v-card-title>
             <v-card-text>
-              <p class="text-body-1">{{ agent.description }}</p>
+              <p class="text-body-1 text-grey">{{ agent.description }}</p>
               <v-chip
                 class="mt-2"
                 color="primary"
@@ -80,24 +94,59 @@ const newAgent = ref({
   description: "",
   url: "",
 });
-const agents = ref<{ id: string; description: string; url: string }[]>([]);
+const agents = ref<
+  {
+    id: string;
+    description: string;
+    url: string;
+    is_enabled: boolean;
+    updating?: boolean;
+  }[]
+>([]);
 
-// Fetch agents on component mount
+// Update the agents type to include is_enabled
+const toggleAgent = async (agent: any) => {
+  try {
+    // Set local loading state for this specific agent
+    agent.updating = true;
+
+    const { error } = await supabase
+      .from("agents")
+      .update({ is_enabled: agent.is_enabled })
+      .eq("id", agent.id);
+
+    if (error) {
+      // Revert the switch if there's an error
+      agent.is_enabled = !agent.is_enabled;
+      throw error;
+    }
+  } catch (error) {
+    console.error("Error updating agent:", error);
+    // You might want to show an error notification here
+  } finally {
+    agent.updating = false;
+  }
+};
+
+// Update fetchAgents to include is_enabled
 const fetchAgents = async () => {
   try {
     const { data, error } = await supabase
       .from("agents")
-      .select("id, description, url")
+      .select("id, description, url, is_enabled")
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    agents.value = data;
+    agents.value = data.map((agent) => ({
+      ...agent,
+      updating: false, // Add updating property for loading state
+    }));
   } catch (error) {
     console.error("Error fetching agents:", error);
   }
 };
 
-// Refetch agents after creating a new one
+// Update createAgent to include is_enabled
 const createAgent = async () => {
   try {
     loading.value = true;
@@ -105,6 +154,7 @@ const createAgent = async () => {
       {
         description: newAgent.value.description,
         url: newAgent.value.url,
+        is_enabled: true, // Set default value for new agents
       },
     ]);
 
@@ -136,5 +186,14 @@ onMounted(() => {
   position: fixed;
   bottom: 16px;
   right: 16px;
+}
+.disabled-card {
+  background: repeating-linear-gradient(
+    45deg,
+    rgb(245, 245, 245),
+    rgb(245, 245, 245) 10px,
+    rgb(240, 240, 240) 10px,
+    rgb(240, 240, 240) 20px
+  ) !important;
 }
 </style>

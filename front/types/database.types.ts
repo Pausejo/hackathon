@@ -15,6 +15,7 @@ export type Database = {
           created_at: string;
           description: string;
           url: string;
+          is_enabled: boolean;
         };
       };
     };
