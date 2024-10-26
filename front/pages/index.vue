@@ -40,8 +40,9 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useSupabaseClient } from "#imports";
+import type { Database } from "~/types/database.types";
 
-const supabase = useSupabaseClient();
+const supabase = useSupabaseClient<Database>();
 const dialog = ref(false);
 const loading = ref(false);
 const newAgent = ref({
