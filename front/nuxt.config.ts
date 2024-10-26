@@ -4,11 +4,17 @@ export default defineNuxtConfig({
 
   devtools: { enabled: true },
 
-  modules: ["vuetify-nuxt-module"],
+  modules: ["vuetify-nuxt-module", "@nuxtjs/supabase"],
 
   app: {
     head: {
       title: "Agents configurator",
     },
+  },
+
+  supabase: {
+    url: process.env.SUPABASE_URL,
+    key: process.env.SUPABASE_ANON_KEY,
+    redirect: false,
   },
 });
