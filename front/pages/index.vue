@@ -1,7 +1,5 @@
 <template>
   <div>
-    <h1>Agents configurator</h1>
-
     <!-- Agents Grid -->
     <v-container>
       <v-row>
