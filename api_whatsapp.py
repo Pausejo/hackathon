@@ -1,8 +1,10 @@
+import datetime
 import os
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from twilio.rest import Client
 from supabase import create_client, Client as SupabaseClient
 import uvicorn
+from twilio.twiml.messaging_response import MessagingResponse
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -28,13 +30,13 @@ async def receive_whatsapp(request: Request):
     # Extract message details
     message_body = form_data.get("Body", "")
     from_number = form_data.get("From", "")
-    timestamp = form_data.get("MessageSid", "")
+    message_sid = form_data.get("MessageSid", "")
 
     print("===msg=====")
     print(form_data)
     print(message_body)
     print(from_number)
-    print(timestamp)
+    print(message_sid)
     print("========")
     
     try:
@@ -44,7 +46,8 @@ async def receive_whatsapp(request: Request):
         message_data = {
             "role": "user",
             "content": message_body,
-            "timestamp": timestamp
+            "message_sid": message_sid,
+            "timestamp": datetime.datetime.now().isoformat()
         }
 
         if not result.data:
@@ -57,11 +60,40 @@ async def receive_whatsapp(request: Request):
         else:
             # Update existing thread with new message
             supabase.table("threads")\
-                .update({"conversation_history": supabase.fn.array_append('conversation_history', message_data)})\
+                .update({"conversation_history": supabase.table("threads").select("conversation_history").single().execute().data["conversation_history"] + [message_data]})\
                 .eq("reference", from_number)\
                 .execute()
+            
+        # Generate response
+        response = "Tutto OKAY"
         
-        return {"status": "success", "message": "Message saved successfully"}
+        # Save response to thread conversation history
+        response_data = {
+            "role": "assistant", 
+            "content": response,
+            "message_sid": message_sid,
+            "timestamp": datetime.datetime.now().isoformat()
+        }
+        
+        # Get current conversation history
+        thread = supabase.table("threads").select("conversation_history").eq("reference", from_number).execute()
+        conversation_history = thread.data[0]["conversation_history"]
+        
+        # Append new response and update
+        conversation_history.append(response_data)
+        supabase.table("threads")\
+            .update({"conversation_history": conversation_history})\
+            .eq("reference", from_number)\
+            .execute()
+            
+        # Return TwiML response
+        twiml = MessagingResponse()
+        twiml.message(str(response))
+        
+        return Response(
+            content=str(twiml),
+            media_type="application/xml"
+        )
         
     except Exception as e:
         print("===ERROR===")
