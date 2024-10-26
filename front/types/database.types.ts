@@ -11,6 +11,8 @@ export type Database = {
     Tables: {
       agents: {
         Row: {
+          id: string;
+          created_at: string;
           description: string;
           url: string;
         };
