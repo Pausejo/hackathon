@@ -60,8 +60,6 @@ npm run dev
 
 ## 📸 Screenshots
 
-![front config agents](front/screenshots/config.png)
-
-![agents stats](front/screenshots/stats.png)
-
-![thread history](front/screenshots/threads.png)
+<img src="front/screenshots/config.png" width="200">
+<img src="front/screenshots/stats.png" width="200">
+<img src="front/screenshots/threads.png" width=200">
