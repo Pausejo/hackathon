@@ -1,4 +1,4 @@
-# 🤖 AI-Powered Customer Support Platform
+# 🤖 WHatSupport (AI-Powered Customer Support Platform)
 
 A modern, scalable customer support platform that combines intelligent chatbots with agent management capabilities. Built with Nuxt.js, FastAPI, and Supabase.
 
