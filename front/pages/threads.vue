@@ -25,7 +25,11 @@
                 <v-card-text>
                   <template v-if="thread.conversation_history?.[0]">
                     <div class="font-weight-medium d-flex align-center">
-                      <v-icon class="mr-2">mdi-account</v-icon>
+                      <v-icon class="mr-2">{{
+                        thread.conversation_history[0].role === "assistant"
+                          ? "mdi-robot"
+                          : "mdi-account"
+                      }}</v-icon>
                       {{ thread.conversation_history[0].role }}:
                     </div>
                     <div>{{ thread.conversation_history[0].content }}</div>
@@ -58,7 +62,9 @@
             class="mb-4"
           >
             <div class="font-weight-medium d-flex align-center">
-              <v-icon class="mr-2">mdi-account</v-icon>
+              <v-icon class="mr-2">{{
+                message.role === "assistant" ? "mdi-robot" : "mdi-account"
+              }}</v-icon>
               {{ message.role }}:
             </div>
             <div>{{ message.content }}</div>
