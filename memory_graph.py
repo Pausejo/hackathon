@@ -8,6 +8,10 @@ from langgraph.graph import END
 from langgraph.graph import MessagesState
 from langgraph.graph import StateGraph, START
 
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -72,6 +76,11 @@ def summarize_conversation(state: State):
     delete_messages = [RemoveMessage(id=m.id) for m in state["messages"][:-2]]
     return {"summary": response.content, "messages": delete_messages}
 
+def assistant(state: MessagesState):
+    logging.info(f"Messages sent to model: {state['messages']}")
+    result = {"messages": [llm_with_tools.invoke(state["messages"])]}
+    logging.info(f"Result: {result}")
+    return result
 
 # Determine whether to end or summarize the conversation
 def should_continue(state: State):
@@ -85,19 +94,74 @@ def should_continue(state: State):
         return "summarize_conversation"
     
     # Otherwise we can just end
-    return END
+    return "assistant"
 
+
+
+def multiply(a: int, b: int) -> int:
+    """Multiply a and b.
+
+    Args:
+        a: first int
+        b: second int
+    """
+    return a * b
+
+# This will be a tool
+def add(a: int, b: int) -> int:
+    """Adds a and b.
+
+    Args:
+        a: first int
+        b: second int
+    """
+    return a + b
+
+def divide(a: int, b: int) -> float:
+    """Divide a and b.
+
+    Args:
+        a: first int
+        b: second int
+    """
+    return a / b
+
+def clima() -> str:
+    """Get the current weather in a given city."""
+    return "templado" 
+
+def web_browser():
+    pass
+   
+tools = [add, multiply, divide, clima]
+llm_with_tools = model.bind_tools(tools, parallel_tool_calls=False)
+
+
+from langgraph.prebuilt import ToolNode
+from langgraph.prebuilt import tools_condition
 
 def get_graph():
     # Define a new graph
     workflow = StateGraph(State)
     workflow.add_node("conversation", call_model)
     workflow.add_node(summarize_conversation)
+    workflow.add_node("assistant", assistant)
+    workflow.add_node("tools", ToolNode(tools))
+
 
     # Set the entrypoint as conversation
     workflow.add_edge(START, "conversation")
     workflow.add_conditional_edges("conversation", should_continue)
-    workflow.add_edge("summarize_conversation", END)
+    workflow.add_edge("summarize_conversation", "assistant")
+    workflow.add_conditional_edges(
+        "assistant",
+        # If the latest message (result) from assistant is a tool call -> tools_condition routes to tools
+        # If the latest message (result) from assistant is a not a tool call -> tools_condition routes to END
+        tools_condition,
+    )
+    workflow.add_edge("tools", "assistant")
+
+
 
     # Compile
     graph = workflow.compile(checkpointer=memory)
