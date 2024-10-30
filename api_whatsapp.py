@@ -5,9 +5,11 @@ from twilio.rest import Client
 from supabase import create_client, Client as SupabaseClient
 import uvicorn
 from twilio.twiml.messaging_response import MessagingResponse
+from langchain_core.messages import SystemMessage, HumanMessage, RemoveMessage
 from dotenv import load_dotenv
 load_dotenv()
 
+from memory_graph import get_graph
 app = FastAPI()
 
 # Initialize Supabase client
@@ -65,7 +67,12 @@ async def receive_whatsapp(request: Request):
                 .execute()
             
         # Generate response
-        response = "Tutto OKAY"
+        input_message = HumanMessage(content=message_body)
+        config = {"configurable": {"thread_id": from_number}}
+        output = get_graph().invoke({"messages": [input_message]}, config)
+        for m in output['messages']:
+            m.pretty_print()
+        response = output['messages'][-1].content
         
         # Save response to thread conversation history
         response_data = {
