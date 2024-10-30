@@ -6,6 +6,47 @@ from llama_index.core.llms import ChatMessage
 import uvicorn
 from supabase import create_client
 from twilio.twiml.messaging_response import MessagingResponse
+from llama_index.core.tools import FunctionTool
+from llama_index.core.agent import FunctionCallingAgentWorker
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Access environment variables
+LANGCHAIN_TRACING_V2 = os.getenv('LANGCHAIN_TRACING_V2')
+LANGCHAIN_ENDPOINT = os.getenv('LANGCHAIN_ENDPOINT')
+LANGCHAIN_API_KEY = os.getenv('LANGCHAIN_API_KEY')
+LANGCHAIN_PROJECT = os.getenv('LANGCHAIN_PROJECT')
+MISTRAL_API_KEY = os.getenv('MISTRAL_API_KEY')
+
+
+def create_calendar_event():
+    """Creates a google calendar event"""
+    return "Event created"
+
+calendar_tool = FunctionTool.from_defaults(
+            fn=create_calendar_event,
+            description= "Creates a google calendar event"
+        )
+
+
+def add(a: int, b: int) -> int:
+    """Add two integers and returns the result integer"""
+    return a + b
+
+add_tool = FunctionTool.from_defaults(fn=add)
+
+def multiply(a: int, b: int) -> int:
+    """Multiple two integers and returns the result integer"""
+    return a * b
+
+
+
+
+multiply_tool = FunctionTool.from_defaults(fn=multiply)
+
 
 app = FastAPI()
 
@@ -24,19 +65,26 @@ rules = [
 ]
 
 db = {
-    "whatsapp:+34652341859": {
+    "whatsapp:+340000": {
         "name": "Juan Perez",
         "language": "es",
         "customer_type": "premium"
+    },
+    "whatsapp:+340000": {
+        "name": "Juancho Perez",
+        "language": "es",
+        "customer_type": "regular"
     }
 }
+
+
 
 
 store = []
 
 class ChatBot:
     def __init__(self):
-        self.llm = MistralAI(api_key="")
+        self.llm = MistralAI(api_key="hQKmC8iCgRYzYWeIHjW5HdYRKy5CtmCo")
 
     def chat(self, user_message, data_api):
         messages = [
@@ -50,7 +98,19 @@ class ChatBot:
 
         print(resp)
 
-        return resp   
+        return resp  
+
+    def func_tools(self, user_message):
+        agent_worker = FunctionCallingAgentWorker.from_tools(
+            tools=[add_tool, multiply_tool],
+            llm=self.llm,
+            verbose=True,
+            allow_parallel_tool_calls=False,
+        )
+        agent = agent_worker.as_agent()
+        response = agent.chat(user_message)
+        print(str(response))
+        return response
 
 
 chatbot = ChatBot()
@@ -70,8 +130,8 @@ async def whatsapp_webhook(request: Request):
 
     # Get response from chatbot
     print(message_body)
-    response = chatbot.chat(message_body, data_api=data_api)
-
+    # response = chatbot.chat(message_body, data_api=data_api)
+    response = chatbot.func_tools(message_body)
 
     # Return TwiML response
     twiml = MessagingResponse()
